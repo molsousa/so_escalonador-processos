@@ -2,10 +2,11 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
-package escalonador.utils;
+package escalonador.arquivo;
 
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
+import escalonador.utils.Processo;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;

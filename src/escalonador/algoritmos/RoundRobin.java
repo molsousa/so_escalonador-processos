@@ -4,7 +4,6 @@
  */
 package escalonador.algoritmos;
 
-import escalonador.utils.CarregarArquivoCSV;
 import escalonador.utils.Estado;
 import escalonador.utils.Processo;
 import java.util.*;
@@ -16,8 +15,8 @@ import java.util.*;
 public class RoundRobin {
 
     private final List<Processo> processos;
-    private final Queue<Processo> fila_prontos;
-    private final int QUANTUM = 4;
+    private final Queue<Processo> filaProntos;
+    private int quantum;
     private int tempoAtual;
     private boolean cpuOcupada;
     private Processo processoEmExecucao;
@@ -25,18 +24,21 @@ public class RoundRobin {
     private final Random random;
 
     /**
-     * Classe para RoundRobin, inicializa com os processos retirados do arquivo
-     * CSV. Atualiza o estado dos processos para NOVO.
+     * Classe para RoundRobin, inicializa com os processos recebidos no
+     * construtor.<br>
+     * Atualiza o estado dos processos para NOVO.<br>
      *
-     * @param nomeArquivo Nome do arquivo CSV de entrada.
+     * @param processos Lista de processos a serem executados no RoundRobin.
+     * @param quantum Quantum máximo em unidades de tempo.
      */
-    public RoundRobin(List<Processo> processos) {
+    public RoundRobin(List<Processo> processos, int quantum) {
 
-        fila_prontos = new LinkedList<>();
+        filaProntos = new LinkedList<>();
         this.processos = processos;
         tempoAtual = 0;
         cpuOcupada = false;
         processoEmExecucao = null;
+        this.quantum = quantum;
 
         random = new Random();
 
@@ -49,7 +51,11 @@ public class RoundRobin {
     }
 
     /**
-     * Método para executar algoritmo RoundRobin.
+     * Método para executar algoritmo RoundRobin.<br>
+     * Os processos ao chegarem, são adicionados ao final da fila de espera em
+     * estado de pronto.<br>
+     * O primeiro processo da fila é executado até esgotar o quantum fixo ou até
+     * finalizar ele mesmoo seu tempo de CPU.<br>
      */
     public void executar() {
         while (true) {
@@ -57,15 +63,15 @@ public class RoundRobin {
             for (Processo p : processos) {
                 if (p.getTempoChegada() == tempoAtual && p.getEstadoProcesso() == Estado.NOVO) {
                     p.setEstadoProcesso(Estado.PRONTO);
-                    fila_prontos.add(p);
+                    filaProntos.add(p);
                 }
             }
 
             // 2 - Escalonar se CPU ociosa e houver prontos
-            if (!cpuOcupada && !fila_prontos.isEmpty()) {
-                processoEmExecucao = fila_prontos.poll();
+            if (!cpuOcupada && !filaProntos.isEmpty()) {
+                processoEmExecucao = filaProntos.poll();
                 processoEmExecucao.setEstadoProcesso(Estado.EXECUTANDO);
-                processoEmExecucao.setQuantumRestante(QUANTUM);
+                processoEmExecucao.setQuantumRestante(quantum);
                 cpuOcupada = true;
             }
 
@@ -78,7 +84,7 @@ public class RoundRobin {
                     processoEmExecucao = null;
                 } else if (p.getQuantumRestante() == 0) {
                     p.setEstadoProcesso(Estado.PRONTO);
-                    fila_prontos.add(p);
+                    filaProntos.add(p);
                     cpuOcupada = false;
                     processoEmExecucao = null;
                 } else if (random.nextDouble() < p.getProbabilidadeES()) {
@@ -104,13 +110,13 @@ public class RoundRobin {
                     p.setTempoBloqueioRestante(p.getTempoBloqueioRestante() - 1);
                     if (p.getTempoBloqueioRestante() == 0) {
                         p.setEstadoProcesso(Estado.PRONTO);
-                        fila_prontos.add(p);
+                        filaProntos.add(p);
                     }
                 }
             }
 
             // 5 - Exibir estado
-            exibirEstado(tempoAtual, processos, fila_prontos);
+            exibirEstado(tempoAtual, processos, filaProntos);
 
             // 6 - Avançar tempo
             tempoAtual++;
@@ -132,9 +138,9 @@ public class RoundRobin {
     /**
      * Método para exibir estados de execução na tela.
      *
-     * @param tempoAtual
-     * @param processos
-     * @param fila_prontos
+     * @param tempoAtual Tempo atual de CPU.
+     * @param processos Todos os processos.
+     * @param fila_prontos Fila de processos prontos para executar.
      */
     public void exibirEstado(int tempoAtual, List<Processo> processos, Queue<Processo> fila_prontos) {
         System.out.println("Tempo: " + tempoAtual);
@@ -153,4 +159,41 @@ public class RoundRobin {
         System.out.println("null\n");
     }
 
+    public boolean temProcessosProntos() {
+        return (!filaProntos.isEmpty() || cpuOcupada);
+    }
+
+    public void adicionarProcesso(Processo processo) {
+        processo.setEstadoProcesso(Estado.PRONTO);
+        filaProntos.add(processo);
+    }
+
+    public Processo proximoProcesso() {
+        return filaProntos.poll();
+    }
+
+    public int getQuantum() {
+        return quantum;
+    }
+
+    public Processo getProcessoEmExecucao() {
+        return processoEmExecucao;
+    }
+
+    public void setProcessoEmExecucao(Processo processo) {
+        this.processoEmExecucao = processo;
+
+        if (processo == null) {
+            cpuOcupada = false;
+        } else {
+            cpuOcupada = true;
+        }
+    }
+
+    public void exibirFila() {
+        for (Processo p : filaProntos) {
+            System.out.print("|" + p.getPid() + "|->");
+        }
+        System.out.println("null");
+    }
 }

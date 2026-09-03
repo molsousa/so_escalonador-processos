@@ -4,17 +4,21 @@
  */
 package escalonador;
 
+import escalonador.algoritmos.MultiplasFilas;
 import escalonador.algoritmos.RoundRobin;
-import escalonador.utils.CarregarArquivoCSV;
+import escalonador.arquivo.CarregarArquivoCSV;
 import escalonador.utils.Processo;
 import java.io.FileNotFoundException;
 import java.util.List;
+import java.util.Scanner;
 
 /**
  *
  * @author molsousa
  */
 public class Main {
+
+    private static final Scanner scanner = new Scanner(System.in);
 
     /**
      * @param args the command line arguments
@@ -23,10 +27,36 @@ public class Main {
     public static void main(String[] args) throws FileNotFoundException {
         // TODO code application logic here
         List<Processo> processos = CarregarArquivoCSV.carregarArquivoCSV("entrada.csv");
+        int i;
 
-        RoundRobin rr = new RoundRobin(processos);
+        RoundRobin rr = new RoundRobin(processos, 4);
+        MultiplasFilas mf = new MultiplasFilas(processos);
 
-        rr.executar();
+        do {
+            System.out.println("---------------------");
+            System.out.println("1 - Round Robin");
+            System.out.println("2 - Múltiplas Filas");
+            System.out.println("0 - Sair");
+            System.out.println("---------------------");
+            System.out.print("Selecione uma opção: ");
+            
+            i = scanner.nextInt();
+            switch (i) {
+                case 1:
+                    rr.executar();
+                    break;
+                case 2:
+                    mf.executar();
+                    break;
+                case 0:
+                    System.out.println("Obrigado!!");
+                    break;
+                default:
+                    System.out.println("Opção incorreta!!");
+                    break;
+            }
+        } while (i != 0);
+
     }
 
 }
