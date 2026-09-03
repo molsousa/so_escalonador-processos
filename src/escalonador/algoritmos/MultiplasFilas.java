@@ -14,9 +14,9 @@ import java.util.*;
  */
 public class MultiplasFilas {
 
-    private RoundRobin filaRR1;
-    private RoundRobin filaRR2;
-    private RoundRobin filaRR3;
+    private final RoundRobin filaRR1;
+    private final RoundRobin filaRR2;
+    private final RoundRobin filaRR3;
     private int inan1;
     private int inan2;
     private int inan3;
@@ -56,14 +56,15 @@ public class MultiplasFilas {
     }
 
     public RoundRobin obterFilaSugestao(int filaSugerida) {
-        if (filaSugerida == 1) {
-            return filaRR1;
-        } else if (filaSugerida == 2) {
-            return filaRR2;
-        } else if (filaSugerida == 3) {
-            return filaRR3;
-        } else {
-            return null;
+        switch (filaSugerida) {
+            case 1:
+                return filaRR1;
+            case 2:
+                return filaRR2;
+            case 3:
+                return filaRR3;
+            default:
+                return null;
         }
     }
 
@@ -162,21 +163,37 @@ public class MultiplasFilas {
                     }
                 } else {
                     int proximoEvento = Integer.MAX_VALUE;
-                    for (Processo p : processos) {
-                        if (p.getEstadoProcesso() == Estado.NOVO && p.getTempoChegada() > tempoGlobal) {
-                            proximoEvento = Math.min(proximoEvento, p.getTempoChegada());
+                    for (Processo processo : processos) {
+                        if (processo.getEstadoProcesso() == Estado.NOVO && processo.getTempoChegada() > tempoGlobal) {
+                            proximoEvento = Math.min(proximoEvento, processo.getTempoChegada());
                         }
-                        if (p.getEstadoProcesso() == Estado.BLOQUEADO) {
-                            proximoEvento = Math.min(proximoEvento, tempoGlobal + p.getTempoBloqueioRestante());
+                        if (processo.getEstadoProcesso() == Estado.BLOQUEADO) {
+                            proximoEvento = Math.min(proximoEvento, tempoGlobal + processo.getTempoBloqueioRestante());
                         }
                     }
                     if (proximoEvento != Integer.MAX_VALUE) {
+                        int tempoAntigo = tempoGlobal;
+                        int avanco = proximoEvento - tempoAntigo;
+                        // Decrementa os tempos de bloqueio
+                        for (Processo p : processos) {
+                            if (p.getEstadoProcesso() == Estado.BLOQUEADO) {
+                                p.setTempoBloqueioRestante(p.getTempoBloqueioRestante() - avanco);
+                                if (p.getTempoBloqueioRestante() <= 0) {
+                                    p.setEstadoProcesso(Estado.PRONTO);
+                                    RoundRobin filaOriginal = obterFilaSugestao(p.getFilaSugerida());
+                                    filaOriginal.adicionarProcesso(p);
+                                }
+                            }
+                        }
                         tempoGlobal = proximoEvento;
+                        continue;
+
                     } else {
                         break;
                     }
                 }
             }
+            incrementaInanicao(filaAtualRR);
 
             if (processoAtual != null) {
                 // Verificar término
@@ -203,18 +220,17 @@ public class MultiplasFilas {
                 else {
                     processoAtual.setTempoCPURestante(processoAtual.getTempoCPURestante() - 1);
                     processoAtual.setQuantumRestante(processoAtual.getQuantumRestante() - 1);
-                    incrementaInanicao(filaAtualRR);
                 }
             }
 
-            for (Processo p : processos) {
-                if (p.getEstadoProcesso() == Estado.BLOQUEADO) {
-                    p.setTempoBloqueioRestante(p.getTempoBloqueioRestante() - 1);
-                    if (p.getTempoBloqueioRestante() <= 0) {
-                        // Quantum esgotado, volta pro final da fila
-                        p.setEstadoProcesso(Estado.PRONTO);
-                        RoundRobin filaOriginal = obterFilaSugestao(p.getFilaSugerida());
-                        filaOriginal.adicionarProcesso(p);
+            for (Processo processo : processos) {
+                if (processo.getEstadoProcesso() == Estado.BLOQUEADO) {
+                    processo.setTempoBloqueioRestante(processo.getTempoBloqueioRestante() - 1);
+                    if (processo.getTempoBloqueioRestante() <= 0) {
+                        // Processo desbloqueado, volta pro final da fila
+                        processo.setEstadoProcesso(Estado.PRONTO);
+                        RoundRobin filaOriginal = obterFilaSugestao(processo.getFilaSugerida());
+                        filaOriginal.adicionarProcesso(processo);
                     }
                 }
             }
@@ -235,11 +251,11 @@ public class MultiplasFilas {
 
     public void exibirEstado() {
         System.out.println("Tempo Global: " + tempoGlobal);
-        for (Processo p : processos) {
-            System.out.println(p.getPid() + " | " + p.getNomeProcesso() + " | " + p.getEstadoProcesso()
-                    + " | CPU restante: " + p.getTempoCPURestante()
-                    + " | Quantum restante: " + p.getQuantumRestante()
-                    + " | Bloqueio restante: " + p.getTempoBloqueioRestante());
+        for (Processo processo : processos) {
+            System.out.println(processo.getPid() + " | " + processo.getNomeProcesso() + " | " + processo.getEstadoProcesso()
+                    + " | CPU restante: " + processo.getTempoCPURestante()
+                    + " | Quantum restante: " + processo.getQuantumRestante()
+                    + " | Bloqueio restante: " + processo.getTempoBloqueioRestante());
         }
         System.out.print("Fila 1: ");
         filaRR1.exibirFila();

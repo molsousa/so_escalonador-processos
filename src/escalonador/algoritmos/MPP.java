@@ -9,38 +9,49 @@ import escalonador.utils.Processo;
 import java.util.*;
 
 /**
+ * Algoritmo Menor Prioridade Primeiro (MPP).<br>
+ * Começa por processos de menor prioridade.<br>
+ * Objetivo: tratar processos mais pesados de io/cpu-bound e batch para
+ * equivalência de processos.<br>
+ * Vantagem: Inicia processos mais pesados e já acelera processos de E/S.<br>
+ * Desvantagem: Processos mais leves executados depois. Risco de inanição de
+ * processos de maior prioridade<br>
+ * Novo processo categorizado como mais pesado vai ao início, mais leve vai ao
+ * final. Logo deve fazer uso de LinkedList. <br>
  *
  * @author molsousa
  */
-public class RoundRobin {
+public class MPP {
 
-    private final List<Processo> processos;
-    private final Queue<Processo> filaProntos;
-    private final int quantum;
-    private int tempoAtual;
-    private boolean cpuOcupada;
+    private List<Processo> processos;
+    private int quantum;
+    private int quantumEspecial;
     private Processo processoEmExecucao;
+    private boolean cpuOcupada;
+    private int tempoAtual;
+    private List<Processo> listaProntos;
 
     private final Random random;
 
     /**
-     * Classe para RoundRobin, inicializa com os processos recebidos no
-     * construtor.<br>
-     * Atualiza o estado dos processos para NOVO.<br>
+     * Construtor para inicializar algoritmo.
      *
-     * @param processos Lista de processos a serem executados no RoundRobin.
-     * @param quantum Quantum máximo em unidades de tempo.
+     * @param processos Inicializa atributo de lista de processos.
+     * @param quantum Inicializa o quantum geral.
+     * @param quantumEspecial Inicializa o quantum para processos de menor
+     * prioridade.
      */
-    public RoundRobin(List<Processo> processos, int quantum) {
-
-        filaProntos = new LinkedList<>();
+    public MPP(List<Processo> processos, int quantum, int quantumEspecial) {
         this.processos = processos;
-        tempoAtual = 0;
-        cpuOcupada = false;
-        processoEmExecucao = null;
         this.quantum = quantum;
+        this.quantumEspecial = quantumEspecial;
+        this.processoEmExecucao = null;
+        this.cpuOcupada = false;
+        this.tempoAtual = 0;
 
         random = new Random();
+
+        listaProntos = new ArrayList<>();
 
         for (Processo processo : processos) {
             processo.setEstadoProcesso(Estado.NOVO);
@@ -51,40 +62,52 @@ public class RoundRobin {
     }
 
     /**
-     * Método para executar algoritmo RoundRobin.<br>
-     * Os processos ao chegarem, são adicionados ao final da fila de espera em
-     * estado de pronto.<br>
-     * O primeiro processo da fila é executado até esgotar o quantum fixo ou até
-     * finalizar ele mesmoo seu tempo de CPU.<br>
+     * Método principal para execução do algoritmo.<br>
+     * Parecida com a lógica de execução do Round Robin.<br>
+     * Processos de cpu_bound, io_bound e batch são colocados no topo da lista
+     * de processos prontos.<br>
+     * Outros processos que não estejam nessas categorias são colocados ao final
+     * da lista, isto é, de prioridade média ou alta.<br>
      */
     public void executar() {
         while (true) {
-            // 1 - Chegada de processos
             for (Processo processo : processos) {
                 if (processo.getTempoChegada() == tempoAtual && processo.getEstadoProcesso() == Estado.NOVO) {
                     processo.setEstadoProcesso(Estado.PRONTO);
-                    filaProntos.add(processo);
+
+                    if (processo.getTipoProcesso().equals("cpu_bound") || processo.getTipoProcesso().equals("batch")
+                            || processo.getTipoProcesso().equals("io_bound")) {
+                        listaProntos.add(0, processo);
+                    } else {
+                        listaProntos.add(processo);
+                    }
                 }
             }
 
-            // 2 - Escalonar se CPU ociosa e houver prontos
-            if (!cpuOcupada && !filaProntos.isEmpty()) {
-                processoEmExecucao = filaProntos.poll();
+            if (!cpuOcupada && !listaProntos.isEmpty()) {
+                processoEmExecucao = listaProntos.remove(0);
                 processoEmExecucao.setEstadoProcesso(Estado.EXECUTANDO);
-                processoEmExecucao.setQuantumRestante(quantum);
+
+                if (processoEmExecucao.getTipoProcesso().equals("cpu_bound") || processoEmExecucao.getTipoProcesso().equals("batch")
+                        || processoEmExecucao.getTipoProcesso().equals("io_bound")) {
+                    processoEmExecucao.setQuantumRestante(quantumEspecial);
+                } else {
+                    processoEmExecucao.setQuantumRestante(quantum);
+                }
+
                 cpuOcupada = true;
             }
 
-            // 3 - Processar CPU
             if (cpuOcupada) {
                 Processo processo = processoEmExecucao;
+
                 if (processo.getTempoCPURestante() == 0) {
                     processo.setEstadoProcesso(Estado.FINALIZADO);
                     cpuOcupada = false;
                     processoEmExecucao = null;
                 } else if (processo.getQuantumRestante() == 0) {
                     processo.setEstadoProcesso(Estado.PRONTO);
-                    filaProntos.add(processo);
+                    listaProntos.add(processo);
                     cpuOcupada = false;
                     processoEmExecucao = null;
                 } else if (random.nextDouble() < processo.getProbabilidadeES()) {
@@ -95,7 +118,6 @@ public class RoundRobin {
                 } else {
                     processo.setTempoCPURestante(processo.getTempoCPURestante() - 1);
                     processo.setQuantumRestante(processo.getQuantumRestante() - 1);
-                    // Se após decrementar CPU restante chegar a zero, finaliza já
                     if (processo.getTempoCPURestante() == 0) {
                         processo.setEstadoProcesso(Estado.FINALIZADO);
                         cpuOcupada = false;
@@ -104,24 +126,24 @@ public class RoundRobin {
                 }
             }
 
-            // 4 - Atualizar bloqueados
             for (Processo processo : processos) {
                 if (processo.getEstadoProcesso() == Estado.BLOQUEADO) {
                     processo.setTempoBloqueioRestante(processo.getTempoBloqueioRestante() - 1);
                     if (processo.getTempoBloqueioRestante() == 0) {
                         processo.setEstadoProcesso(Estado.PRONTO);
-                        filaProntos.add(processo);
+                        if (processo.getTipoProcesso().equals("cpu_bound") || processo.getTipoProcesso().equals("batch")
+                                || processo.getTipoProcesso().equals("io_bound")) {
+                            listaProntos.add(0, processo);
+                        } else {
+                            listaProntos.add(processo);
+                        }
                     }
                 }
             }
 
-            // 5 - Exibir estado
-            exibirEstado(tempoAtual, processos, filaProntos);
-
-            // 6 - Avançar tempo
+            exibirEstado(tempoAtual, processos, listaProntos);
             tempoAtual++;
 
-            // 7 - Verificar se ainda existem processos não finalizados
             boolean existeAtivo = false;
             for (Processo processo : processos) {
                 if (processo.getEstadoProcesso() != Estado.FINALIZADO) {
@@ -129,6 +151,7 @@ public class RoundRobin {
                     break;
                 }
             }
+
             if (!existeAtivo) {
                 break;
             }
@@ -140,60 +163,22 @@ public class RoundRobin {
      *
      * @param tempoAtual Tempo atual de CPU.
      * @param processos Todos os processos.
-     * @param fila_prontos Fila de processos prontos para executar.
+     * @param listaProntos Fila de processos prontos para executar.
      */
-    public void exibirEstado(int tempoAtual, List<Processo> processos, Queue<Processo> fila_prontos) {
+    public void exibirEstado(int tempoAtual, List<Processo> processos, List<Processo> listaProntos) {
         System.out.println("Tempo: " + tempoAtual);
 
         for (Processo processo : processos) {
-            System.out.println(processo.getPid() + " | " + processo.getNomeProcesso() + " | " + processo.getEstadoProcesso()
-                    + " | " + processo.getTempoCPURestante());
+            System.out.println(processo.getPid() + " | " + processo.getNomeProcesso() + " | " + processo.getTipoProcesso() + " | "
+                    + processo.getEstadoProcesso() + " | " + processo.getTempoCPURestante());
         }
         System.out.println();
-        System.out.print("Fila de prontos: ");
+        System.out.print("Lista de prontos: ");
 
-        for (Processo processo : fila_prontos) {
+        for (Processo processo : listaProntos) {
             System.out.print("|" + processo.getPid() + "|->");
         }
 
         System.out.println("null\n");
-    }
-
-    public boolean temProcessosProntos() {
-        return (!filaProntos.isEmpty() || cpuOcupada);
-    }
-
-    public void adicionarProcesso(Processo processo) {
-        processo.setEstadoProcesso(Estado.PRONTO);
-        filaProntos.add(processo);
-    }
-
-    public Processo proximoProcesso() {
-        return filaProntos.poll();
-    }
-
-    public int getQuantum() {
-        return quantum;
-    }
-
-    public Processo getProcessoEmExecucao() {
-        return processoEmExecucao;
-    }
-
-    public void setProcessoEmExecucao(Processo processo) {
-        this.processoEmExecucao = processo;
-
-        if (processo == null) {
-            cpuOcupada = false;
-        } else {
-            cpuOcupada = true;
-        }
-    }
-
-    public void exibirFila() {
-        for (Processo processo : filaProntos) {
-            System.out.print("|" + processo.getPid() + "|->");
-        }
-        System.out.println("null");
     }
 }
